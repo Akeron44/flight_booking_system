@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomBytes, scrypt as _scrypt } from 'crypto';
 import { CreateUserDto } from 'src/user/dtos/create-user.dto';
 import { promisify } from 'util';
 import { UserService } from '../user.service';
+import { checkIfUserExist } from '../helper/checkUser';
 
 const scrypt = promisify(_scrypt);
 
@@ -35,10 +32,7 @@ export class AuthService {
 
   async signin(email: string, password: string) {
     const [user] = await this.userService.find(email);
-
-    if (!user) {
-      throw new NotFoundException('User not found.');
-    }
+    checkIfUserExist(user);
 
     const [salt, storedHash] = user.password.split('.');
     const hash = (await scrypt(password, salt, 32)) as Buffer;
