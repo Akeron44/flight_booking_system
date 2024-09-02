@@ -12,6 +12,7 @@ import { BookingModule } from 'src/booking/booking.module';
   imports: [TypeOrmModule.forFeature([User]), FlightModule, BookingModule],
   providers: [UserService, AuthService],
   controllers: [UserController],
+  exports: [UserService],
 })
 export class UserModule {
   configure(consumer: MiddlewareConsumer) {

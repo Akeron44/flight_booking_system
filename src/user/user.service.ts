@@ -47,7 +47,7 @@ export class UserService {
     }
   }
 
-  async updateUserCredit(id: number, extraCredit: number) {
+  async addUserCredit(id: number, extraCredit: number) {
     try {
       const user = await this.userRepo.findOneBy({ id });
       checkIfUserExist(user);
@@ -63,6 +63,23 @@ export class UserService {
       });
     } catch (error) {
       throw new Error(error);
+    }
+  }
+
+  async updateUserCredit(users: any) {
+    for (let i = 0; i < users.length; i++) {
+      let updatedUser = {};
+      let user = await this.userRepo.findOneBy({ id: users[i]['id'] });
+
+      updatedUser = {
+        ...user,
+        credit: user.credit + users[i]['price'],
+      };
+
+      await this.userRepo.save({
+        id: user.id,
+        ...updatedUser,
+      });
     }
   }
 

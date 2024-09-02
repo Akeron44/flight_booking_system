@@ -57,7 +57,7 @@ export class UserController {
   @Patch()
   @UseGuards(AuthGuard)
   updateUserCredit(@Session() session: any, @Body() body: UpdateUserDto) {
-    return this.userService.updateUserCredit(session.userId, body.extraCredit);
+    return this.userService.addUserCredit(session.userId, body.extraCredit);
   }
 
   @Serialize(FlightDto)
@@ -70,7 +70,7 @@ export class UserController {
     return this.userService.getFlights(query, session.userId);
   }
 
-  @Get('/flights/:flightId')
+  @Get('/flights/:flightId/seats')
   @UseGuards(AuthGuard)
   async getAvailableSeats(@Param('flightId') flightId: string) {
     return this.userService.getAvailableSeats(parseInt(flightId));

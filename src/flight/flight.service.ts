@@ -9,9 +9,14 @@ import { Flight } from './entities/flight.entity';
 import { User } from 'src/user/entities/user.entity';
 import { CreateFlightDto } from './dtos/create-flight.dto';
 import { FlightQueryDto } from 'src/user/dtos/flight-query.dto';
-import { checkIfFlightExist } from './helper/checkFlight';
+import {
+  checkFlightDepartureAndArrival,
+  checkFlightLogic,
+  checkIfFlightExist,
+} from './helper/checkFlight';
 import { AirplaneService } from 'src/airplane/airplane.service';
 import { generateAirplaneSeats } from './helper/generateSeatNumbers';
+import { UpdateFlightDto } from './dtos/update-flight.dto';
 
 @Injectable()
 export class FlightService {
@@ -31,11 +36,14 @@ export class FlightService {
         );
       }
 
-      const flight = this.flightRepo.create({
+      checkFlightLogic(flightObj);
+
+      const newFlight = this.flightRepo.create({
         ...flightObj,
         seats: generateAirplaneSeats(airplane.capacity),
       });
-      return this.flightRepo.save(flight);
+      newFlight.airplane = airplane;
+      return this.flightRepo.save(newFlight);
     } catch (error) {
       throw new Error(error);
     }
@@ -108,28 +116,74 @@ export class FlightService {
     }
   }
 
-  async updateSeats(id: number, seats: string[]) {
+  async getFlight(id: number) {
+    const flight = await this.flightRepo
+      .createQueryBuilder('flight')
+      .leftJoinAndSelect('flight.airplane', 'airplane')
+      .where('flight.id = :id', { id })
+      .getOne();
+
+    checkIfFlightExist(flight);
+
+    return flight;
+  }
+
+  async updateSeats(id: number, seats: string[], method: string) {
     try {
       const flight = await this.flightRepo.findOneBy({ id });
       checkIfFlightExist(flight);
 
-      const updatedSeats = flight.seats.filter(
-        (availableSeats) => !seats.includes(availableSeats),
-      );
+      if (method === 'remove') {
+        const updatedSeats = flight.seats.filter(
+          (availableSeats) => !seats.includes(availableSeats),
+        );
 
-      const updatedFlight = {
-        ...flight,
-        seats: updatedSeats,
-      };
+        const updatedFlight = {
+          ...flight,
+          seats: updatedSeats,
+        };
 
-      await this.flightRepo.save({
-        id: flight.id,
-        ...updatedFlight,
-      });
+        await this.flightRepo.save({
+          id: flight.id,
+          ...updatedFlight,
+        });
+      }
+
+      if (method === 'add') {
+        const updatedSeats = [...flight.seats, ...seats];
+        const updatedFlight = { ...flight, seats: updatedSeats };
+        await this.flightRepo.save(updatedFlight);
+      }
     } catch (error) {
       throw new BadRequestException(
         'Something went wrong with updating the number of seats on the flight.',
       );
     }
+  }
+
+  async updateFlight(id: number, updateFlightObj: UpdateFlightDto) {
+    if (!id) return null;
+    if (Object.keys(updateFlightObj).length === 0)
+      return new BadRequestException('No data provided.');
+
+    const flight = await this.flightRepo.findOneBy({ id });
+    checkIfFlightExist(flight);
+    checkFlightDepartureAndArrival(flight, updateFlightObj);
+
+    const updatedFlight = {
+      ...flight,
+      ...updateFlightObj,
+    };
+
+    await this.flightRepo.save({
+      id: flight.id,
+      ...updateFlightObj,
+    });
+
+    return updatedFlight;
+  }
+
+  async deleteFlight(id: number) {
+    return await this.flightRepo.delete({ id });
   }
 }
