@@ -7,9 +7,15 @@ import { AuthService } from './auth/auth.service';
 import { CurrentUserMiddleware } from './middlewares/current-user.middleware';
 import { FlightModule } from 'src/flight/flight.module';
 import { BookingModule } from 'src/booking/booking.module';
+import { PdfModule } from 'src/pdf/pdf.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User]), FlightModule, BookingModule],
+  imports: [
+    TypeOrmModule.forFeature([User]),
+    FlightModule,
+    BookingModule,
+    PdfModule,
+  ],
   providers: [UserService, AuthService],
   controllers: [UserController],
   exports: [UserService],

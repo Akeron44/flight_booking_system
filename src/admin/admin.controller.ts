@@ -14,9 +14,7 @@ import { CreateFlightDto } from 'src/flight/dtos/create-flight.dto';
 import { UpdateFlightDto } from 'src/flight/dtos/update-flight.dto';
 import { AdminGuard } from 'src/guards/admin.guard';
 import { AdminService } from './admin.service';
-import { Serialize } from 'src/interceptors/serialize.interceptor';
-import { BookingDto } from 'src/booking/dtos/booking.dto';
-import { FlightQueryDto } from 'src/user/dtos/flight-query.dto';
+import { FlightSearchDto } from 'src/flight/dtos/flight-search.dto';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
@@ -29,8 +27,8 @@ export class AdminController {
   }
 
   @Get('flight')
-  async getFlights(@Query() query: FlightQueryDto, @Session() session: any) {
-    return this.adminService.getFlights(query, session.userId);
+  async getAllFlights(@Query() query: FlightSearchDto) {
+    return this.adminService.getAllFlights(query);
   }
 
   @Get('/flight/:flightId')
@@ -48,7 +46,16 @@ export class AdminController {
     return this.adminService.deleteFlight(parseInt(id));
   }
 
-  @Serialize(BookingDto)
+  @Get('/previous/flight')
+  getPreviousFlightsNumber() {
+    return this.adminService.getPreviousFlightsNumber();
+  }
+
+  @Get('/airplanes')
+  getAvailableAirplanes(@Query() query: FlightSearchDto) {
+    return this.adminService.getAvailableAirplanes(query);
+  }
+
   @Get('/booking')
   getBookings(@Session() session: any) {
     return this.adminService.getBookings(session.userId);
@@ -60,5 +67,25 @@ export class AdminController {
     @Param('response') response: string,
   ) {
     return this.adminService.updateBookingStatus(parseInt(bookingId), response);
+  }
+
+  @Get('/revenue')
+  getRevenue() {
+    return this.adminService.getRevenue();
+  }
+
+  @Get('/passangers')
+  getPassangersNumber() {
+    return this.adminService.getPassangersNumber();
+  }
+
+  @Get('/passangers/booking')
+  getTopUsersByBookings() {
+    return this.adminService.getTopUsersByBookings();
+  }
+
+  @Get('/passangers/credit')
+  getTopUsersByExpenses() {
+    return this.adminService.getTopUsersByExpenses();
   }
 }

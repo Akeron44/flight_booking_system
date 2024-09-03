@@ -8,6 +8,7 @@ import { FlightQueryDto } from './dtos/flight-query.dto';
 import { CreateBookingDto } from 'src/booking/dtos/create-booking.dto';
 import { BookingService } from 'src/booking/booking.service';
 import { checkIfUserExist } from './helper/checkUser';
+import { PdfService } from 'src/pdf/pdf.service';
 
 @Injectable()
 export class UserService {
@@ -15,6 +16,7 @@ export class UserService {
     @InjectRepository(User) private userRepo: Repository<User>,
     private flightService: FlightService,
     private bookingService: BookingService,
+    private pdfService: PdfService,
   ) {}
 
   create(userObj: CreateUserDto) {
@@ -144,9 +146,24 @@ export class UserService {
       if (!userId || !bookingId) {
         return null;
       }
-      return await this.bookingService.getApprovedBooking(userId, bookingId);
+      const approvedBooking = await this.bookingService.getApprovedBooking(
+        userId,
+        bookingId,
+      );
+
+      return this.pdfService.generateBookingPdf(approvedBooking);
     } catch (error) {
       throw new Error(error);
     }
+  }
+
+  async getPassangersNumber() {
+    const users = await this.userRepo
+      .createQueryBuilder('user')
+      .select('COUNT(user)', 'totalNumber')
+      .where('user.isAdmin = :isAdmin', { isAdmin: false })
+      .getRawOne();
+
+    return users.totalNumber;
   }
 }

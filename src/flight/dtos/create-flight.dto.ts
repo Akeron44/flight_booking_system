@@ -32,7 +32,7 @@ export class CreateFlightDto {
   destination: string;
 
   @IsNumber()
-  @Min(1)
-  @Max(1000000000)
+  @Min(4000)
+  @Max(10000)
   price: number;
 }

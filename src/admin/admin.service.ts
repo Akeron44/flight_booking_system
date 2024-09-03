@@ -4,8 +4,11 @@ import { CreateFlightDto } from 'src/flight/dtos/create-flight.dto';
 import { UpdateFlightDto } from 'src/flight/dtos/update-flight.dto';
 import { FlightService } from 'src/flight/flight.service';
 import { checkIfFlightExist } from 'src/flight/helper/checkFlight';
-import { FlightQueryDto } from 'src/user/dtos/flight-query.dto';
 import { UserService } from 'src/user/user.service';
+import { EmailService } from 'src/email/email.service';
+import { FlightSearchDto } from 'src/flight/dtos/flight-search.dto';
+import { Airplane } from 'src/airplane/entities/airplane.entity';
+import { AirplaneService } from 'src/airplane/airplane.service';
 
 @Injectable()
 export class AdminService {
@@ -13,14 +16,16 @@ export class AdminService {
     private flightService: FlightService,
     private bookingService: BookingService,
     private userService: UserService,
+    private emailService: EmailService,
+    private airplaneService: AirplaneService,
   ) {}
 
   createFlight(body: CreateFlightDto) {
     return this.flightService.createFlight(body);
   }
 
-  getFlights(query: FlightQueryDto, userId: number) {
-    return this.userService.getFlights(query, userId);
+  getAllFlights(query: FlightSearchDto) {
+    return this.flightService.getAllFlights(query);
   }
 
   getFlight(id: number) {
@@ -56,6 +61,10 @@ export class AdminService {
     return `Flight with id: ${id} and its corresponsding bookings were deleted.`;
   }
 
+  getPreviousFlightsNumber() {
+    return this.flightService.getPreviousFlightsNumber();
+  }
+
   getBookings(id: number) {
     return this.userService.getBookings(id);
   }
@@ -71,9 +80,51 @@ export class AdminService {
     if (booking.status === 'rejected') {
       this.userService.addUserCredit(booking.user.id, booking.totalPrice);
       this.flightService.updateSeats(booking.flight.id, booking.seat, 'add');
+
+      await this.emailService.sendEmail(
+        booking.user.email,
+        booking.user.firstName,
+        'rejected',
+        `We are sorry to inform you, that your booking with id 
+        ${booking.flight.id} on ${booking.flight.departure} from ${booking.flight.origin} 
+        to ${booking.flight.destination} has been rejected.`,
+      );
+
       return `The booking with id ${booking.id} was rejected and the credit was returned to user with id ${booking.user.id}.`;
     }
 
+    await this.emailService.sendEmail(
+      booking.user.email,
+      booking.user.firstName,
+      'approved',
+      `Your booking with id ${booking.flight.id} on ${booking.flight.departure} 
+      from ${booking.flight.origin} to ${booking.flight.destination} has been approved.`,
+    );
+
     return `The booking with id ${booking.id} was approved.`;
+  }
+
+  async getAvailableAirplanes(query: FlightSearchDto) {
+    const flights = await this.flightService.getAllFlights(query);
+    const ids = flights.map((flight) => flight.airplane.id);
+    const uniqueExludedIds = [...new Set(ids)];
+
+    return this.airplaneService.getAvailableAirplanes(uniqueExludedIds);
+  }
+
+  getRevenue() {
+    return this.bookingService.getBookingsRevenue();
+  }
+
+  getPassangersNumber() {
+    return this.userService.getPassangersNumber();
+  }
+
+  getTopUsersByBookings() {
+    return this.bookingService.getTopUsersByBookings();
+  }
+
+  getTopUsersByExpenses() {
+    return this.bookingService.getTopUsersByExpenses();
   }
 }

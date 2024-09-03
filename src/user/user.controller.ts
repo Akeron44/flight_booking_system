@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   Session,
   UseGuards,
 } from '@nestjs/common';
@@ -90,16 +91,25 @@ export class UserController {
     return this.userService.getBookings(session.userId);
   }
 
-  @Serialize(BookingDto)
   @Get('/booking/:bookingId')
   @UseGuards(AuthGuard)
-  getApprovedBooking(
+  async getApprovedBooking(
     @Session() session: any,
     @Param('bookingId') bookingId: string,
+    @Res() response: any,
   ) {
-    return this.userService.getApprovedBooking(
+    const pdfBuffer = await this.userService.getApprovedBooking(
       session.userId,
       parseInt(bookingId),
     );
+
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename=booking_receipt.pdf`,
+    );
+    response.status(200);
+
+    return response.send(pdfBuffer);
   }
 }

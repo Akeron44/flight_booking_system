@@ -17,6 +17,7 @@ import {
 import { AirplaneService } from 'src/airplane/airplane.service';
 import { generateAirplaneSeats } from './helper/generateSeatNumbers';
 import { UpdateFlightDto } from './dtos/update-flight.dto';
+import { FlightSearchDto } from './dtos/flight-search.dto';
 
 @Injectable()
 export class FlightService {
@@ -116,6 +117,48 @@ export class FlightService {
     }
   }
 
+  async getAllFlights(query: FlightSearchDto) {
+    const queryBuilder = this.dataSource
+      .createQueryBuilder()
+      .select('flight')
+      .from(Flight, 'flight')
+      .leftJoinAndSelect('flight.airplane', 'airplane');
+
+    const startTime = query.departureTime || '00:00:00';
+    const endTime = query.arrivalTime || '23:59:59';
+
+    if (query.departure && !query.arrival) {
+      const startOfDay = `${query.departure}T${startTime}.000Z`;
+      const flightsArray = await queryBuilder
+        .where('flight.departure >= :startOfDay', { startOfDay })
+        .getMany();
+
+      return flightsArray || [];
+    }
+
+    if (query.arrival && !query.departure) {
+      const endOfDay = `${query.arrival}T${endTime}.999Z`;
+      const flightsArray = await queryBuilder
+        .where('flight.arrival <= :endOfDay', { endOfDay })
+        .getMany();
+      return flightsArray || [];
+    }
+
+    if (query.departure && query.arrival) {
+      const startOfDay = `${query.departure}T${startTime}.000Z`;
+      const endOfDay = `${query.arrival}T${endTime}.999Z`;
+
+      const flightsArray = await queryBuilder
+        .where('flight.departure >= :startOfDay', { startOfDay })
+        .andWhere('flight.arrival <= :endOfDay', { endOfDay })
+        .getMany();
+
+      return flightsArray || [];
+    }
+
+    return await queryBuilder.getMany();
+  }
+
   async getFlight(id: number) {
     const flight = await this.flightRepo
       .createQueryBuilder('flight')
@@ -126,6 +169,18 @@ export class FlightService {
     checkIfFlightExist(flight);
 
     return flight;
+  }
+
+  async getPreviousFlightsNumber() {
+    const currentDateTime = new Date().toISOString();
+    const previousFlightsNumber = await this.flightRepo
+      .createQueryBuilder('flight')
+      .select('COUNT(flight.id)', 'flights')
+      .where('flight.departure < :currentDateTime', { currentDateTime })
+      .groupBy('flight.id')
+      .getRawMany();
+
+    return previousFlightsNumber;
   }
 
   async updateSeats(id: number, seats: string[], method: string) {
