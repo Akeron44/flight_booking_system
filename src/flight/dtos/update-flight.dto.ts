@@ -35,7 +35,7 @@ export class UpdateFlightDto {
 
   @IsNumber()
   @IsOptional()
-  @Min(1)
-  @Max(1000000000)
+  @Min(4500)
+  @Max(12000)
   price: number;
 }

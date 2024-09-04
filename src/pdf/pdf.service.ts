@@ -23,7 +23,10 @@ export class PdfService {
         },
         { text: `User: ${bookingData.user.id}`, style: 'subheader' },
         { text: `Seat: ${bookingData.seat}`, style: 'subheader' },
-        { text: `Total Price: $${bookingData.totalPrice}`, style: 'subheader' },
+        {
+          text: `Total Price: ${bookingData.totalPrice}  ALL`,
+          style: 'subheader',
+        },
         {
           text: `Booking Status: ${bookingData.status}`,
           style: 'subheader',

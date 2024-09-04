@@ -9,7 +9,17 @@ export function checkIfFlightExist(flight: Flight) {
   }
 }
 
-export function checkFlightLogic(requestBody: CreateFlightDto) {
+export function adjustDateAndTime(date: Date) {
+  const originalDate = new Date(date);
+  const offsetHours = 2;
+  const adjustedDate = new Date(
+    originalDate.getTime() + offsetHours * 60 * 60 * 1000,
+  );
+
+  return adjustedDate;
+}
+
+export function validateFlight(requestBody: CreateFlightDto) {
   const departure = requestBody.departure;
   const arrival = requestBody.arrival;
 
@@ -46,10 +56,18 @@ export function checkFlightLogic(requestBody: CreateFlightDto) {
   }
 }
 
-export function checkFlightDepartureAndArrival(
+export function validateDepartureAndArrival(
   flight: Flight,
   updateBody: UpdateFlightDto,
 ) {
+  const currentDateTime = new Date();
+  if (
+    updateBody.departure < currentDateTime ||
+    updateBody.arrival < currentDateTime
+  ) {
+    throw new BadRequestException("Flight can't be in the past");
+  }
+
   if (updateBody.departure && !updateBody.arrival) {
     if (updateBody.departure >= flight.arrival) {
       throw new BadRequestException("Departure can't be later than arrival");

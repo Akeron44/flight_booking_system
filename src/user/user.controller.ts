@@ -16,12 +16,13 @@ import { SigninUserDto } from './dtos/signin-user.dto';
 import { AuthGuard } from 'src/guards/auth.guard';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { UserService } from './user.service';
-import { FlightQueryDto } from './dtos/flight-query.dto';
+import { FlightSearchDto } from 'src/flight/dtos/flight-search.dto';
 import { CreateBookingDto } from 'src/booking/dtos/create-booking.dto';
 import { BookingDto } from 'src/booking/dtos/booking.dto';
 import { Serialize } from 'src/interceptors/serialize.interceptor';
 import { FlightDto } from 'src/flight/dtos/flight.dot';
 import { UserDto } from './dtos/user.dto';
+import { UserFlightSearchDto } from 'src/flight/dtos/user-flight-search.dto';
 
 @Controller('user')
 export class UserController {
@@ -64,11 +65,11 @@ export class UserController {
   @Serialize(FlightDto)
   @Get('/flights')
   @UseGuards(AuthGuard)
-  async getUserFlights(
-    @Query() query: FlightQueryDto,
+  async searchFlights(
+    @Query() query: UserFlightSearchDto,
     @Session() session: any,
   ) {
-    return this.userService.getFlights(query, session.userId);
+    return this.userService.searchFlights(query, session.userId);
   }
 
   @Get('/flights/:flightId/seats')
@@ -78,20 +79,20 @@ export class UserController {
   }
 
   @Serialize(BookingDto)
-  @Post('/booking')
+  @Post('/bookings')
   @UseGuards(AuthGuard)
   async createBooking(@Body() body: CreateBookingDto, @Session() session: any) {
     return this.userService.createBooking(body, session.userId);
   }
 
   @Serialize(BookingDto)
-  @Get('/booking')
+  @Get('/bookings')
   @UseGuards(AuthGuard)
   getBookings(@Session() session: any) {
     return this.userService.getBookings(session.userId);
   }
 
-  @Get('/booking/:bookingId')
+  @Get('/bookings/:bookingId')
   @UseGuards(AuthGuard)
   async getApprovedBooking(
     @Session() session: any,

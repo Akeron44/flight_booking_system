@@ -1,7 +1,6 @@
 import {
   BadRequestException,
-  HttpException,
-  HttpStatus,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -28,13 +27,11 @@ export class BookingService {
   async findOne(id: number) {
     if (!id) return null;
 
-    const booking = this.bookingRepo
-      .createQueryBuilder('booking')
-      .leftJoinAndSelect('booking.user', 'user')
-      .where('booking.id = :id', { id })
-      .getOne();
+    const booking = await this.bookingRepo.findOneBy({ id });
 
-    if (!booking) throw new NotFoundException('Booking not found.');
+    if (!booking) {
+      throw new NotFoundException('Booking not found.');
+    }
 
     return booking;
   }
@@ -60,7 +57,7 @@ export class BookingService {
       returnFlightSeat: bookingRequest.returnFlightSeat || [],
       returnFlightId,
       flightPrice: flight.price,
-      returnFlightPrice: returnFlight.price || null,
+      returnFlightPrice: returnFlight ? returnFlight.price : null,
     });
 
     bookingRequest.seat = checkAndGetSeats(
@@ -117,26 +114,22 @@ export class BookingService {
   }
 
   async getBookings(user: User) {
-    try {
-      const queryBuilder = this.bookingRepo
-        .createQueryBuilder('booking')
-        .leftJoinAndSelect('booking.flight', 'flight')
-        .leftJoinAndSelect('booking.returnFlight', 'returnFlight')
-        .leftJoinAndSelect('booking.user', 'user');
+    const queryBuilder = this.bookingRepo
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.flight', 'flight')
+      .leftJoinAndSelect('booking.returnFlight', 'returnFlight')
+      .leftJoinAndSelect('booking.user', 'user');
 
-      if (user.isAdmin) {
-        const bookings = await queryBuilder.getMany();
-        return bookings || [];
-      }
-
-      const bookings = await queryBuilder
-        .where('booking.user.id = :id', { id: user.id })
-        .getMany();
-
+    if (user.isAdmin) {
+      const bookings = await queryBuilder.getMany();
       return bookings || [];
-    } catch (error) {
-      throw new Error(error);
     }
+
+    const bookings = await queryBuilder
+      .where('booking.user.id = :id', { id: user.id })
+      .getMany();
+
+    return bookings || [];
   }
 
   async getDeletedBookings(flightId: number) {
@@ -155,30 +148,29 @@ export class BookingService {
       .createQueryBuilder('booking')
       .delete()
       .where('"booking"."flightId" = :flightId', { flightId })
+      .orWhere('"booking"."returnFlightId" = :returnFlightId', {
+        returnFlightId: flightId,
+      })
       .execute();
   }
 
   async getApprovedBooking(userId: number, bookingId: number) {
-    try {
-      const booking = await this.bookingRepo
-        .createQueryBuilder('booking')
-        .leftJoinAndSelect('booking.flight', 'flight')
-        .leftJoinAndSelect('booking.user', 'user')
-        .where('booking.id = :id', { id: bookingId })
-        .getOne();
+    const booking = await this.bookingRepo
+      .createQueryBuilder('booking')
+      .leftJoinAndSelect('booking.flight', 'flight')
+      .leftJoinAndSelect('booking.user', 'user')
+      .where('booking.id = :id', { id: bookingId })
+      .getOne();
 
-      if (booking.user.id !== userId) {
-        throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
-      }
-
-      if (!booking || booking.status !== 'approved') {
-        throw new NotFoundException('Booking not found.');
-      }
-
-      return booking;
-    } catch (error) {
-      throw new Error(error);
+    if (booking.user.id !== userId) {
+      throw new ForbiddenException('Forbidden');
     }
+
+    if (!booking || booking.status !== 'approved') {
+      throw new NotFoundException('You can not download this booking.');
+    }
+
+    return booking;
   }
 
   async updateBookingStatus(id: number, response: string) {
@@ -221,13 +213,14 @@ export class BookingService {
       .where('booking.status = :status', { status: 'approved' })
       .getRawOne();
 
-    return bookings.totalSum;
+    return bookings.totalSum || 0;
   }
 
   async getTopUsersByBookings() {
     const topUsers = await this.bookingRepo
       .createQueryBuilder('booking')
       .leftJoin('booking.user', 'user')
+      .where('booking.status = :status', { status: 'approved' })
       .select('user.id', 'userId')
       .addSelect('user.firstName', 'firstName')
       .addSelect('COUNT(booking.id)', 'bookings')
@@ -243,6 +236,7 @@ export class BookingService {
     const topUsers = await this.bookingRepo
       .createQueryBuilder('booking')
       .leftJoin('booking.user', 'user')
+      .where('booking.status = :status', { status: 'approved' })
       .select('user.id', 'userId')
       .addSelect('user.firstName', 'firstName')
       .addSelect('SUM(booking.totalPrice)', 'totalSpent')

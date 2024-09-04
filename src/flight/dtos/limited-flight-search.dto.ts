@@ -1,14 +1,6 @@
 import { IsString, IsOptional } from 'class-validator';
 
-export class FlightSearchDto {
-  @IsString()
-  @IsOptional()
-  origin?: string;
-
-  @IsString()
-  @IsOptional()
-  destination?: string;
-
+export class LimitiedFlightSearchDto {
   @IsString()
   @IsOptional()
   departure: string;

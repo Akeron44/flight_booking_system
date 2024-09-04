@@ -7,7 +7,7 @@ export function validateReturnFlight(flight: Flight, returnFlight: Flight) {
     flight.destination === flight.origin
   ) {
     throw new BadRequestException(
-      'Please check the origin and destination of both flights.',
+      'Origin flight has to match the destination of your return flight and vice versa.',
     );
   }
 

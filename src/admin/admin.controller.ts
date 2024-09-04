@@ -15,53 +15,62 @@ import { UpdateFlightDto } from 'src/flight/dtos/update-flight.dto';
 import { AdminGuard } from 'src/guards/admin.guard';
 import { AdminService } from './admin.service';
 import { FlightSearchDto } from 'src/flight/dtos/flight-search.dto';
+import { LimitiedFlightSearchDto } from 'src/flight/dtos/limited-flight-search.dto';
+import { Serialize } from 'src/interceptors/serialize.interceptor';
+import { DetailedFlightDto } from 'src/flight/dtos/flight-details.dto';
+import { BookingDto } from 'src/booking/dtos/booking.dto';
 
 @Controller('admin')
 @UseGuards(AdminGuard)
 export class AdminController {
   constructor(private adminService: AdminService) {}
 
-  @Post('/flight')
+  @Serialize(DetailedFlightDto)
+  @Post('/flights')
   createFlight(@Body() body: CreateFlightDto) {
     return this.adminService.createFlight(body);
   }
 
-  @Get('flight')
-  async getAllFlights(@Query() query: FlightSearchDto) {
-    return this.adminService.getAllFlights(query);
+  @Serialize(DetailedFlightDto)
+  @Get('flights')
+  async getFlights(@Query() query: FlightSearchDto) {
+    return this.adminService.getFlights(query);
   }
 
-  @Get('/flight/:flightId')
+  @Serialize(DetailedFlightDto)
+  @Get('/flights/:flightId')
   getFlight(@Param('flightId') id: string) {
     return this.adminService.getFlight(parseInt(id));
   }
 
-  @Patch('/flight/:flightId')
+  @Serialize(DetailedFlightDto)
+  @Patch('/flights/:flightId')
   updateFlight(@Param('flightId') id: string, @Body() body: UpdateFlightDto) {
     return this.adminService.updateFlight(parseInt(id), body);
   }
 
-  @Delete('/flight/:flightId')
+  @Delete('/flights/:flightId')
   deleteFlight(@Param('flightId') id: string) {
     return this.adminService.deleteFlight(parseInt(id));
   }
 
-  @Get('/previous/flight')
+  @Get('/previous/flights')
   getPreviousFlightsNumber() {
     return this.adminService.getPreviousFlightsNumber();
   }
 
   @Get('/airplanes')
-  getAvailableAirplanes(@Query() query: FlightSearchDto) {
+  getAvailableAirplanes(@Query() query: any) {
     return this.adminService.getAvailableAirplanes(query);
   }
 
-  @Get('/booking')
+  @Serialize(BookingDto)
+  @Get('/bookings')
   getBookings(@Session() session: any) {
     return this.adminService.getBookings(session.userId);
   }
 
-  @Patch('/booking/:bookingId/:response')
+  @Patch('/bookings/:bookingId/:response')
   updateBookingStatus(
     @Param('bookingId') bookingId: string,
     @Param('response') response: string,

@@ -4,159 +4,136 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Flight } from './entities/flight.entity';
 import { User } from 'src/user/entities/user.entity';
 import { CreateFlightDto } from './dtos/create-flight.dto';
-import { FlightQueryDto } from 'src/user/dtos/flight-query.dto';
 import {
-  checkFlightDepartureAndArrival,
-  checkFlightLogic,
+  validateFlight,
   checkIfFlightExist,
+  validateDepartureAndArrival,
+  adjustDateAndTime,
 } from './helper/checkFlight';
 import { AirplaneService } from 'src/airplane/airplane.service';
 import { generateAirplaneSeats } from './helper/generateSeatNumbers';
 import { UpdateFlightDto } from './dtos/update-flight.dto';
 import { FlightSearchDto } from './dtos/flight-search.dto';
+import { UserFlightSearchDto } from './dtos/user-flight-search.dto';
 
 @Injectable()
 export class FlightService {
   constructor(
     @InjectRepository(Flight) private flightRepo: Repository<Flight>,
-    private dataSource: DataSource,
     private airplaneService: AirplaneService,
   ) {}
 
   async createFlight(flightObj: CreateFlightDto) {
-    try {
-      const airplane = await this.airplaneService.findOne(flightObj.airplaneId);
+    const airplane = await this.airplaneService.findOne(flightObj.airplaneId);
 
-      if (!airplane) {
-        throw new NotFoundException(
-          `Airplane with the given id ${flightObj.airplaneId} was not found.`,
-        );
-      }
-
-      checkFlightLogic(flightObj);
-
-      const newFlight = this.flightRepo.create({
-        ...flightObj,
-        seats: generateAirplaneSeats(airplane.capacity),
-      });
-      newFlight.airplane = airplane;
-      return this.flightRepo.save(newFlight);
-    } catch (error) {
-      throw new Error(error);
+    if (!airplane) {
+      throw new NotFoundException(
+        `Airplane with the given id ${flightObj.airplaneId} was not found.`,
+      );
     }
+
+    validateFlight(flightObj);
+    flightObj.departure = adjustDateAndTime(flightObj.departure);
+    flightObj.arrival = adjustDateAndTime(flightObj.arrival);
+
+    const newFlight = this.flightRepo.create({
+      ...flightObj,
+      seats: generateAirplaneSeats(airplane.capacity),
+    });
+    newFlight.airplane = airplane;
+
+    return this.flightRepo.save(newFlight);
   }
 
   async findOne({ id }) {
-    try {
-      const flight = await this.flightRepo.findOneBy({ id });
-      checkIfFlightExist(flight);
+    const flight = await this.flightRepo.findOneBy({ id });
+    checkIfFlightExist(flight);
 
-      return flight;
-    } catch (error) {
-      throw new Error(error);
-    }
+    return flight;
   }
 
-  async getFlights(query: FlightQueryDto, user: User) {
-    try {
-      const queryBuilder = this.dataSource
-        .createQueryBuilder()
-        .select('flight')
-        .from(Flight, 'flight');
+  async searchFlights(query: UserFlightSearchDto, user: User) {
+    const currentDateTime = new Date().toISOString();
+    const queryBuilder = this.flightRepo.createQueryBuilder('flight');
 
-      const currentDateTime = new Date().toISOString();
-
-      if (!query.departure && !query.origin && !query.destination) {
-        const flightsArray = await queryBuilder
-          .where('flight.origin ILIKE :origin', { origin: `%${user.country}%` })
-          .andWhere('flight.departure >= :currentDateTime', { currentDateTime })
-          .getMany();
-
-        return flightsArray || [];
-      } else {
-        const flightsArray = await queryBuilder
-          .where(
-            new Brackets((qb) => {
-              if (query.origin) {
-                qb.where('flight.origin ILIKE :origin', {
-                  origin: `%${query.origin}%`,
-                });
-              }
-
-              if (query.destination) {
-                qb.andWhere('flight.destination ILIKE :destination', {
-                  destination: `%${query.destination}%`,
-                });
-              }
-
-              if (query.departure) {
-                const startOfDay = `${query.departure}T00:00:00.000Z`;
-                const endOfDay = `${query.departure}T23:59:59.999Z`;
-
-                qb.andWhere(
-                  'flight.departure BETWEEN :startOfDay AND :endOfDay',
-                  {
-                    startOfDay,
-                    endOfDay,
-                  },
-                );
-              }
-            }),
-          )
-          .andWhere('flight.departure >= :currentDateTime', { currentDateTime })
-          .getMany();
-
-        return flightsArray || [];
-      }
-    } catch (error) {
-      throw new Error(error);
+    if (!query.departure && !query.origin && !query.destination) {
+      return await queryBuilder
+        .where('flight.origin ILIKE :origin', { origin: `%${user.country}%` })
+        .andWhere('flight.departure >= :currentDateTime', { currentDateTime })
+        .getMany();
     }
+
+    const flightsArray = await queryBuilder
+      .where(
+        new Brackets((qb) => {
+          if (query.origin) {
+            qb.where('flight.origin ILIKE :origin', {
+              origin: `%${query.origin}%`,
+            });
+          }
+
+          if (query.destination) {
+            qb.andWhere('flight.destination ILIKE :destination', {
+              destination: `%${query.destination}%`,
+            });
+          }
+
+          if (query.departure) {
+            const startOfDay = `${query.departure}T00:00:00.000Z`;
+            const endOfDay = `${query.departure}T23:59:59.999Z`;
+
+            qb.andWhere('flight.departure BETWEEN :startOfDay AND :endOfDay', {
+              startOfDay,
+              endOfDay,
+            });
+          }
+        }),
+      )
+      .andWhere('flight.departure >= :currentDateTime', { currentDateTime })
+      .getMany();
+
+    return flightsArray || [];
   }
 
-  async getAllFlights(query: FlightSearchDto) {
-    const queryBuilder = this.dataSource
-      .createQueryBuilder()
-      .select('flight')
-      .from(Flight, 'flight')
-      .leftJoinAndSelect('flight.airplane', 'airplane');
-
+  async getFlights(query: FlightSearchDto) {
     const startTime = query.departureTime || '00:00:00';
     const endTime = query.arrivalTime || '23:59:59';
 
-    if (query.departure && !query.arrival) {
-      const startOfDay = `${query.departure}T${startTime}.000Z`;
-      const flightsArray = await queryBuilder
-        .where('flight.departure >= :startOfDay', { startOfDay })
-        .getMany();
+    const flightsArray = await this.flightRepo
+      .createQueryBuilder('flight')
+      .leftJoinAndSelect('flight.airplane', 'airplane')
+      .where(
+        new Brackets((qb) => {
+          if (query.departure) {
+            const startOfDay = new Date(`${query.departure}T${startTime}.000Z`);
+            qb.where('flight.departure >= :startOfDay', { startOfDay });
+          }
 
-      return flightsArray || [];
-    }
+          if (query.arrival) {
+            const endOfDay = new Date(`${query.arrival}T${endTime}.999Z`);
+            qb.andWhere('flight.arrival <= :endOfDay', { endOfDay });
+          }
 
-    if (query.arrival && !query.departure) {
-      const endOfDay = `${query.arrival}T${endTime}.999Z`;
-      const flightsArray = await queryBuilder
-        .where('flight.arrival <= :endOfDay', { endOfDay })
-        .getMany();
-      return flightsArray || [];
-    }
+          if (query.origin) {
+            qb.andWhere('flight.origin ILIKE :origin', {
+              origin: `%${query.origin}%`,
+            });
+          }
 
-    if (query.departure && query.arrival) {
-      const startOfDay = `${query.departure}T${startTime}.000Z`;
-      const endOfDay = `${query.arrival}T${endTime}.999Z`;
+          if (query.destination) {
+            qb.andWhere('flight.destination ILIKE :destination', {
+              destination: `%${query.destination}%`,
+            });
+          }
+        }),
+      )
+      .getMany();
 
-      const flightsArray = await queryBuilder
-        .where('flight.departure >= :startOfDay', { startOfDay })
-        .andWhere('flight.arrival <= :endOfDay', { endOfDay })
-        .getMany();
-
-      return flightsArray || [];
-    }
-
-    return await queryBuilder.getMany();
+    return flightsArray || [];
   }
 
   async getFlight(id: number) {
@@ -184,46 +161,56 @@ export class FlightService {
   }
 
   async updateSeats(id: number, seats: string[], method: string) {
-    try {
-      const flight = await this.flightRepo.findOneBy({ id });
-      checkIfFlightExist(flight);
+    const flight = await this.flightRepo.findOneBy({ id });
+    checkIfFlightExist(flight);
 
-      if (method === 'remove') {
-        const updatedSeats = flight.seats.filter(
-          (availableSeats) => !seats.includes(availableSeats),
-        );
-
-        const updatedFlight = {
-          ...flight,
-          seats: updatedSeats,
-        };
-
-        await this.flightRepo.save({
-          id: flight.id,
-          ...updatedFlight,
-        });
-      }
-
-      if (method === 'add') {
-        const updatedSeats = [...flight.seats, ...seats];
-        const updatedFlight = { ...flight, seats: updatedSeats };
-        await this.flightRepo.save(updatedFlight);
-      }
-    } catch (error) {
-      throw new BadRequestException(
-        'Something went wrong with updating the number of seats on the flight.',
+    if (method === 'remove') {
+      const updatedSeats = flight.seats.filter(
+        (availableSeats) => !seats.includes(availableSeats),
       );
+
+      const updatedFlight = {
+        ...flight,
+        seats: updatedSeats,
+      };
+
+      await this.flightRepo.save({
+        id: flight.id,
+        ...updatedFlight,
+      });
+    }
+
+    if (method === 'add') {
+      const updatedSeats = [...seats, ...flight.seats];
+      const updatedFlight = { ...flight, seats: updatedSeats };
+      await this.flightRepo.save(updatedFlight);
     }
   }
 
   async updateFlight(id: number, updateFlightObj: UpdateFlightDto) {
-    if (!id) return null;
-    if (Object.keys(updateFlightObj).length === 0)
-      return new BadRequestException('No data provided.');
+    if (!id) throw new BadRequestException('Invalid ID.');
+    if (Object.keys(updateFlightObj).length === 0) {
+      throw new BadRequestException('No data provided.');
+    }
 
-    const flight = await this.flightRepo.findOneBy({ id });
+    const flight = await this.flightRepo
+      .createQueryBuilder('flight')
+      .leftJoinAndSelect('flight.airplane', 'airplane')
+      .where('flight.id = :id', { id })
+      .getOne();
+
     checkIfFlightExist(flight);
-    checkFlightDepartureAndArrival(flight, updateFlightObj);
+    validateDepartureAndArrival(flight, updateFlightObj);
+
+    if (updateFlightObj.departure) {
+      const newDeparture = adjustDateAndTime(updateFlightObj.departure);
+      updateFlightObj.departure = newDeparture;
+    }
+
+    if (updateFlightObj.arrival) {
+      const newArrival = adjustDateAndTime(updateFlightObj.departure);
+      updateFlightObj.arrival = newArrival;
+    }
 
     const updatedFlight = {
       ...flight,

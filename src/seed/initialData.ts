@@ -208,7 +208,7 @@ export const flightSeed = [
   {
     departure: new Date('2024-09-10T09:00:00.000Z'),
     arrival: new Date('2024-09-10T11:00:00.000Z'),
-    origin: 'Durres, Albania',
+    origin: 'Tirane, Albania',
     destination: 'Athens, Greece',
     airplaneId: 1,
     price: 4500,
@@ -218,7 +218,7 @@ export const flightSeed = [
     departure: new Date('2024-09-11T10:00:00.000Z'),
     arrival: new Date('2024-09-11T12:00:00.000Z'),
     origin: 'Athens, Greece',
-    destination: 'Istanbul, Turkey',
+    destination: 'Tirane, Albania',
     airplaneId: 2,
     price: 5000,
     seats: seatsArray,
