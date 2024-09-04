@@ -4,9 +4,9 @@ export class FlightDto {
   @Expose()
   id: number;
   @Expose()
-  departure: string;
+  departure: Date;
   @Expose()
-  arrival: string;
+  arrival: Date;
   @Expose()
   origin: string;
   @Expose()

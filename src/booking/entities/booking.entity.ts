@@ -16,11 +16,17 @@ export class Booking {
   @Column('text', { array: true })
   seat: string[];
 
+  @Column('text', { array: true, default: [] })
+  returnFlightSeat: string[];
+
   @Column({ default: 'pending' })
   status: string;
 
   @ManyToOne(() => Flight, (flight) => flight.bookings)
   flight: Flight;
+
+  @ManyToOne(() => Flight, (flight) => flight.bookings)
+  returnFlight: Flight;
 
   @ManyToOne(() => User, (user) => user.bookings)
   user: User;

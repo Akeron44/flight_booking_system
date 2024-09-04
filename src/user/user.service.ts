@@ -4,10 +4,11 @@ import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dtos/create-user.dto';
 import { FlightService } from 'src/flight/flight.service';
-import { FlightQueryDto } from './dtos/flight-query.dto';
 import { CreateBookingDto } from 'src/booking/dtos/create-booking.dto';
 import { BookingService } from 'src/booking/booking.service';
 import { checkIfUserExist } from './helper/checkUser';
+import { PdfService } from 'src/pdf/pdf.service';
+import { UserFlightSearchDto } from 'src/flight/dtos/user-flight-search.dto';
 
 @Injectable()
 export class UserService {
@@ -15,121 +16,133 @@ export class UserService {
     @InjectRepository(User) private userRepo: Repository<User>,
     private flightService: FlightService,
     private bookingService: BookingService,
+    private pdfService: PdfService,
   ) {}
 
   create(userObj: CreateUserDto) {
-    try {
-      const user = this.userRepo.create(userObj);
-      return this.userRepo.save(user);
-    } catch (error) {
-      throw new Error(error);
-    }
+    const user = this.userRepo.create(userObj);
+    return this.userRepo.save(user);
   }
 
   async find(email: string) {
-    try {
-      if (!email) return null;
-      return this.userRepo.find({ where: { email: email } });
-    } catch (error) {
-      throw new Error(error);
-    }
+    if (!email) return null;
+    return this.userRepo.find({ where: { email: email } });
   }
 
   async findOne(id: number) {
-    try {
-      if (!id) return null;
-      const user = await this.userRepo.findOneBy({ id });
-      checkIfUserExist(user);
+    if (!id) return null;
+    const user = await this.userRepo.findOneBy({ id });
+    checkIfUserExist(user);
 
-      return user;
-    } catch (error) {
-      throw new Error(error);
-    }
+    return user;
   }
 
-  async updateUserCredit(id: number, extraCredit: number) {
-    try {
-      const user = await this.userRepo.findOneBy({ id });
-      checkIfUserExist(user);
+  async addUserCredit(id: number, extraCredit: number) {
+    if (!id) return null;
 
-      const updatedUser = {
+    const user = await this.userRepo.findOneBy({ id });
+    checkIfUserExist(user);
+
+    const updatedUser = {
+      ...user,
+      credit: user.credit + extraCredit,
+    };
+
+    return await this.userRepo.save({
+      id: id,
+      ...updatedUser,
+    });
+  }
+
+  async updateUserCredit(users: any) {
+    for (let i = 0; i < users.length; i++) {
+      let updatedUser = {};
+      let user = await this.userRepo.findOneBy({ id: users[i]['id'] });
+
+      updatedUser = {
         ...user,
-        credit: user.credit + extraCredit,
-      };
-
-      return await this.userRepo.save({
-        id: id,
-        ...updatedUser,
-      });
-    } catch (error) {
-      throw new Error(error);
-    }
-  }
-
-  async getFlights(query: FlightQueryDto, id: number) {
-    try {
-      const user = await this.userRepo.findOneBy({ id });
-      checkIfUserExist(user);
-
-      return await this.flightService.getFlights(query, user);
-    } catch (error) {
-      throw new Error(error);
-    }
-  }
-
-  async getAvailableSeats(id: number) {
-    try {
-      const flight = await this.flightService.findOne({ id });
-      return flight.seats;
-    } catch (error) {}
-  }
-
-  async createBooking(bookingObj: CreateBookingDto, id: number) {
-    try {
-      const user = await this.userRepo.findOneBy({ id });
-      checkIfUserExist(user);
-
-      const booking = await this.bookingService.createBooking(bookingObj, user);
-
-      if (!booking) {
-        throw new NotFoundException('Booking not found.');
-      }
-
-      const updatedUser = {
-        ...user,
-        credit: user.credit - booking.totalPrice,
+        credit: user.credit + users[i]['price'],
       };
 
       await this.userRepo.save({
-        id: id,
+        id: user.id,
         ...updatedUser,
       });
-
-      return booking;
-    } catch (error) {
-      throw new Error(error);
     }
+  }
+
+  async searchFlights(query: UserFlightSearchDto, id: number) {
+    if (!id) return null;
+
+    const user = await this.userRepo.findOneBy({ id });
+    checkIfUserExist(user);
+
+    return await this.flightService.searchFlights(query, user);
+  }
+
+  async getAvailableSeats(id: number) {
+    if (!id) return null;
+
+    const flight = await this.flightService.findOne({ id });
+    return flight.seats;
+  }
+
+  async createBooking(bookingObj: CreateBookingDto, id: number) {
+    if (!id) return null;
+
+    const user = await this.userRepo.findOneBy({ id });
+    checkIfUserExist(user);
+
+    const booking = await this.bookingService.createBooking(bookingObj, user);
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found.');
+    }
+
+    const updatedUser = {
+      ...user,
+      credit: user.credit - booking.totalPrice,
+    };
+
+    await this.userRepo.save({
+      id: id,
+      ...updatedUser,
+    });
+
+    return booking;
   }
 
   async getBookings(id: number) {
-    try {
-      const user = await this.userRepo.findOneBy({ id });
-      checkIfUserExist(user);
+    if (!id) return null;
 
-      return await this.bookingService.getBookings(user);
-    } catch (error) {
-      throw new Error(error);
-    }
+    const user = await this.userRepo.findOneBy({ id });
+    checkIfUserExist(user);
+
+    return await this.bookingService.getBookings(user);
   }
 
   async getApprovedBooking(userId: number, bookingId: number) {
-    try {
-      if (!userId || !bookingId) {
-        return null;
-      }
-      return await this.bookingService.getApprovedBooking(userId, bookingId);
-    } catch (error) {
-      throw new Error(error);
+    if (!userId || !bookingId) {
+      return null;
     }
+
+    await this.bookingService.findOne(bookingId);
+
+    const approvedBooking = await this.bookingService.getApprovedBooking(
+      userId,
+      bookingId,
+    );
+
+    return this.pdfService.generateBookingPdf(approvedBooking);
+  }
+
+  async getPassangersNumber() {
+    const users = await this.userRepo
+      .createQueryBuilder('user')
+      .select('COUNT(user)', 'totalNumber')
+      .where('user.isAdmin = :isAdmin', { isAdmin: false })
+      .getRawOne();
+
+    return users.totalNumber;
   }
 }

@@ -14,10 +14,10 @@ export class Flight {
   id: number;
 
   @Column()
-  departure: string;
+  departure: Date;
 
   @Column()
-  arrival: string;
+  arrival: Date;
 
   @Column()
   origin: string;

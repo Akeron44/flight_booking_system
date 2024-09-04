@@ -8,6 +8,8 @@ import { AdminModule } from './admin/admin.module';
 import { FlightModule } from './flight/flight.module';
 import { BookingModule } from './booking/booking.module';
 import { AirplaneModule } from './airplane/airplane.module';
+import { EmailModule } from './email/email.module';
+import { PdfModule } from './pdf/pdf.module';
 
 const cookieSession = require('cookie-session');
 
@@ -22,6 +24,8 @@ const cookieSession = require('cookie-session');
     FlightModule,
     BookingModule,
     AirplaneModule,
+    EmailModule,
+    PdfModule,
   ],
   controllers: [AppController],
   providers: [AppService],

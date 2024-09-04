@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   Session,
   UseGuards,
 } from '@nestjs/common';
@@ -15,12 +16,13 @@ import { SigninUserDto } from './dtos/signin-user.dto';
 import { AuthGuard } from 'src/guards/auth.guard';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { UserService } from './user.service';
-import { FlightQueryDto } from './dtos/flight-query.dto';
+import { FlightSearchDto } from 'src/flight/dtos/flight-search.dto';
 import { CreateBookingDto } from 'src/booking/dtos/create-booking.dto';
 import { BookingDto } from 'src/booking/dtos/booking.dto';
 import { Serialize } from 'src/interceptors/serialize.interceptor';
 import { FlightDto } from 'src/flight/dtos/flight.dot';
 import { UserDto } from './dtos/user.dto';
+import { UserFlightSearchDto } from 'src/flight/dtos/user-flight-search.dto';
 
 @Controller('user')
 export class UserController {
@@ -57,49 +59,58 @@ export class UserController {
   @Patch()
   @UseGuards(AuthGuard)
   updateUserCredit(@Session() session: any, @Body() body: UpdateUserDto) {
-    return this.userService.updateUserCredit(session.userId, body.extraCredit);
+    return this.userService.addUserCredit(session.userId, body.extraCredit);
   }
 
   @Serialize(FlightDto)
   @Get('/flights')
   @UseGuards(AuthGuard)
-  async getUserFlights(
-    @Query() query: FlightQueryDto,
+  async searchFlights(
+    @Query() query: UserFlightSearchDto,
     @Session() session: any,
   ) {
-    return this.userService.getFlights(query, session.userId);
+    return this.userService.searchFlights(query, session.userId);
   }
 
-  @Get('/flights/:flightId')
+  @Get('/flights/:flightId/seats')
   @UseGuards(AuthGuard)
   async getAvailableSeats(@Param('flightId') flightId: string) {
     return this.userService.getAvailableSeats(parseInt(flightId));
   }
 
   @Serialize(BookingDto)
-  @Post('/booking')
+  @Post('/bookings')
   @UseGuards(AuthGuard)
   async createBooking(@Body() body: CreateBookingDto, @Session() session: any) {
     return this.userService.createBooking(body, session.userId);
   }
 
   @Serialize(BookingDto)
-  @Get('/booking')
+  @Get('/bookings')
   @UseGuards(AuthGuard)
   getBookings(@Session() session: any) {
     return this.userService.getBookings(session.userId);
   }
 
-  @Serialize(BookingDto)
-  @Get('/booking/:bookingId')
+  @Get('/bookings/:bookingId')
   @UseGuards(AuthGuard)
-  getApprovedBooking(
+  async getApprovedBooking(
     @Session() session: any,
     @Param('bookingId') bookingId: string,
+    @Res() response: any,
   ) {
-    return this.userService.getApprovedBooking(
+    const pdfBuffer = await this.userService.getApprovedBooking(
       session.userId,
       parseInt(bookingId),
     );
+
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename=booking_receipt.pdf`,
+    );
+    response.status(200);
+
+    return response.send(pdfBuffer);
   }
 }

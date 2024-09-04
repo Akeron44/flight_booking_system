@@ -2,7 +2,7 @@ import { IsNumber, Min, Max } from 'class-validator';
 
 export class UpdateUserDto {
   @IsNumber()
-  @Min(1000)
-  @Max(20000)
+  @Min(5000)
+  @Max(15000)
   extraCredit: number;
 }
